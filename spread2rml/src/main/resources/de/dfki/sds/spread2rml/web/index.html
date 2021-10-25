@@ -1,0 +1,213 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+
+        <link href="/css/bootstrap.css" rel="stylesheet" />
+        <link href="/css/all.min.css" rel="stylesheet" />
+        <link href="/css/jquery-ui.css" rel="stylesheet" />
+        <link href="/css/loader.css" rel="stylesheet" />
+
+        <script src="/js/jquery.min.js"></script>
+        <script src="/js/jquery-ui.min.js"></script>
+        <script src="/js/bootstrap.min.js" ></script>
+        <script src="/js/vue.js" ></script>
+
+        <script src="/js/data.js" ></script>
+
+        <link rel="shortcut icon" href="/favicon.ico">
+        <title>Demo | Spread2RML</title>
+    </head>
+    <body>
+        
+        <style>
+            table, th, td {
+                border: 1px solid #c0c0c0;
+                border-collapse: collapse;
+            }
+            table {
+                width: 100%;
+            }
+            th {
+                font-weight: normal;
+                text-align: center;
+                background-color: #f6f5f4
+            }
+            td {
+                vertical-align: bottom;
+            }
+            .row-header {
+                background-color: #f6f5f4;
+                width: 20px;
+                text-align: center;
+            }
+        </style>
+
+        <div class="container-fluid" id="app">
+            <div class="row">
+                <div class="col">
+
+                    <img src="img/spread2rml.png" style="height: 80px; margin-right: 20px;" class="float-left" />
+                    <h1>Spread2RML<br/><span style="font-size: 20px"><span class="text-muted">Constructing Knowledge Graphs by Predicting RML Mappings on Messy Spreadsheets</span>
+                        &nbsp;&nbsp;
+                        <a target="_blank" href="https://github.com/mschroeder-github/spread2rml">Code@GitHub</a>
+                        &nbsp;&nbsp;
+                        <a target="_blank" href="http://www.dfki.uni-kl.de/~mschroeder/">Author</a>
+                        </span>
+                    </h1>
+
+                    <br/>
+
+                    <h3>Matching Demo <button class="btn btn-primary btn-sm" @click="runMatching()">Run Matching <i class="fa fa-arrow-right"></i></button></h3>
+                    <div class="row">
+
+                        <div class="col-4">
+                            <img src="img/rdf.png" style="width:32px;"/> 
+                            RDF Graph A <span class="text-muted">(in Turtle Syntax)</span>
+                            <div class="float-right">Example
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="selectMatchingExample(1)">#1</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @click="selectMatchingExample(2)">#2</button>
+                            </div>
+                                </div>
+                            <textarea rows="10" v-model="matchGraphA" class="form-control" style="font-family: monospace; font-size: 12px; white-space: pre;"></textarea>
+                        </div>
+                        
+                        <div class="col-4">
+                            <img src="img/rdf.png" style="width:32px;"/> 
+                            RDF Graph B <span class="text-muted">(in Turtle Syntax)</span>
+                            <textarea rows="10" v-model="matchGraphB" class="form-control" style="font-family: monospace; font-size: 12px; white-space: pre;"></textarea>
+                        </div>
+                        
+                        <div class="col-4">
+                            <i class="fa fa-exchange-alt"></i> Matches <span v-if="matchTable">({{matchTable.length}})</span>
+                            
+                            <div v-if="matchTable">
+                                <table class="table table-bordered" v-for="solution in matchTable">
+                                    <tr v-for="row in solution">
+                                        <td>{{row[0]}}</td>
+                                        <td>{{row[1]}}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            
+                            <textarea v-if="matchException" v-model="matchException" readonly rows="10" class="form-control" style="font-family: monospace; font-size: 12px; white-space: pre;"></textarea>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div style="background: white; font-size: 12px;" class="fixed-bottom">
+                &nbsp;
+
+                &copy; 2021 <a href="https://www.dfki.de/" target="_blank"><img src="/img/DFKI_Logo.jpg" style="height: 12px;"></a>
+                &nbsp;
+                &nbsp;
+                <a href="https://www.dfki.de/web/legal-info-en" target="_blank"><i class="fa fa-balance-scale"></i>  Legal Info</a>
+                &nbsp;
+                &nbsp;
+                <a href="http://www.dfki.uni-kl.de/datenschutz/data-protection-en.html" target="_blank"><i class="fa fa-lock"></i>  Data Protection</a>
+            </div>
+        </div>
+        
+        
+        <script>
+            var vm = new Vue({
+                el: '#app',
+                data: {
+                    result: '',
+                    wait: false,
+                    matchGraphA: '',
+                    matchGraphB: '',
+                    matchTable: null,
+                    matchException: ''
+                },
+                created: function () {
+                    //this.select(0);
+                    console.log('created');
+                },
+                methods: {
+                    select: function(i) {
+                        this.selected = i;
+                        this.code = mappings[i].code;
+                        this.result = '';
+                        this.runRML();
+                    },
+                    switchResult: function(b) {
+                        var diff = (this.showResult != b);
+                        this.showResult = b;
+                        if(!b) {
+                            this.result = fno;
+                        } else if(diff) {
+                            this.result = '';
+                        }
+                    },
+                    runMatching: function () {
+                        this.wait = true;
+                        this.result = '';
+                        this.showResult = true;
+                        this.matchTable = null;
+                        
+                        var vue = this;
+                        
+                        var data = {
+                            matchGraphA: this.matchGraphA,
+                            matchGraphB: this.matchGraphB
+                        };
+                        
+                        $.ajax({
+                            type: 'POST',
+                            url: '/runMatching',
+                            data: JSON.stringify(data),
+                            success: function (data, textStatus, request) {
+                                vue.wait = false;
+                                vue.result = data;
+                                vue.matchTable = data.solutions;
+                                vue.matchException = data.exception;
+                            },
+                            error: function (request, textStatus, errorThrown) {
+                                vue.wait = false;
+                                vue.matchException = request.responseText;
+                            }
+                        });
+                    },
+                    selectMatchingExample: function (num) {
+                        this.matchGraphA = matchExamples[num-1][0];
+                        this.matchGraphB = matchExamples[num-1][1];
+                        this.runMatching();
+                    },
+                    runRML: function () {
+                        this.wait = true;
+                        this.result = '';
+                        this.showResult = true;
+                        
+                        var vue = this;
+                        
+                        var data = {
+                            code: this.code
+                        };
+                        
+                        $.ajax({
+                            type: 'POST',
+                            url: '/runRML',
+                            data: JSON.stringify(data),
+                            success: function (data, textStatus, request) {
+                                vue.wait = false;
+                                vue.result = data;
+                            },
+                            error: function (request, textStatus, errorThrown) {
+                                vue.wait = false;
+                                vue.result = request.responseText;
+                            }
+                        });
+                    }
+                }
+            });
+        </script>
+        
+        
+
+    </body>
+</html>
